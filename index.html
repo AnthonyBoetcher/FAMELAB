@@ -337,6 +337,10 @@ const saturdayColors = [
 // Sunday: all off-peak
 const sundayColors = Array(24).fill(OFFPEAK);
 
+const standardIndices = [8,9,20,21];
+const offpeakIndices = [0,1,2,3,4,5,6,7,10,11,12,13,14,15,16,22,23];
+const peakIndices = [17,18,19];
+
 // Ring radii
 const r3 = R;        // outer edge of weekday ring
 const r2 = R * 0.78; // inner edge of weekday / outer of saturday
@@ -346,6 +350,7 @@ const hubR = R * 0.16;
 
 let rotation = 0; // current wheel rotation in radians
 let spinning = false;
+let spinCount = 0;
 
 function drawWheel(rot) {
   ctx.clearRect(0, 0, W, H);
@@ -459,10 +464,29 @@ function startSpin() {
   spinning = true;
   document.getElementById('spinBtn').disabled = true;
 
-  const totalDuration = 2600; // ms, max ~3s
-  const extraSpins = 3 + Math.random() * 4; // 3–7 full rotations
-  const randomOffset = Math.random() * Math.PI * 2;
-  const totalAngle = extraSpins * Math.PI * 2 + randomOffset;
+  spinCount++;
+  const cycle = (spinCount - 1) % 8; // since spinCount starts at 1 after ++
+  let targetSeg;
+  if (cycle === 0 || cycle === 2) { // Standard
+    targetSeg = standardIndices[Math.floor(Math.random() * standardIndices.length)];
+  } else if (cycle === 1) { // off-peak
+    targetSeg = offpeakIndices[Math.floor(Math.random() * offpeakIndices.length)];
+  } else if (cycle === 3) { // Peak
+    targetSeg = peakIndices[Math.floor(Math.random() * peakIndices.length)];
+  } else { // 4,5,6,7 random
+    targetSeg = Math.floor(Math.random() * 24);
+  }
+
+  const totalDuration = 2000; // ms
+  const extraSpins = 5;
+  const segAngle = Math.PI * 2 / 24;
+  const desiredRelAngle = targetSeg * segAngle + segAngle / 2;
+  const desiredFinalRot = -Math.PI / 2 - desiredRelAngle;
+  let totalAngle = desiredFinalRot - rotation + extraSpins * Math.PI * 2;
+  // Ensure positive
+  while (totalAngle < 0) totalAngle += Math.PI * 2;
+  // Ensure at least 1 full rotation
+  if (totalAngle < 2 * Math.PI) totalAngle += 2 * Math.PI;
 
   const startRot = rotation;
   const startTime = performance.now();
