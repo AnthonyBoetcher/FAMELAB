@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tariff Wheel — Demand Side Energy Shift</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Arial, sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 2rem;
+    letter-spacing: 0.04em;
+    color: #fff;
+    text-transform: uppercase;
+  }
+
+  .layout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 60px;
+    flex-wrap: wrap;
+    padding: 20px;
+  }
+
+  /* KEY */
+  .key-panel {
+    background: #16213e;
+    border: 1px solid #0f3460;
+    border-radius: 12px;
+    padding: 28px 36px;
+    min-width: 180px;
+  }
+
+  .key-panel h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .key-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .key-item:last-child { margin-bottom: 0; }
+
+  .key-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .key-dot.peak     { background: #cc2222; }
+  .key-dot.standard { background: #e6c800; }
+  .key-dot.offpeak  { background: #1e7e34; }
+
+  .key-label {
+    font-size: 1rem;
+    font-weight: 500;
+    color: #ddd;
+  }
+
+  /* WHEEL AREA */
+  .wheel-area {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Arrow sits above the wheel, pointing down into the top segment */
+  .arrow-container {
+    position: relative;
+    width: 340px;
+    height: 50px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .arrow {
+    width: 0;
+    height: 0;
+    border-left: 22px solid transparent;
+    border-right: 22px solid transparent;
+    border-top: 40px solid #ff1a1a;
+    filter: drop-shadow(0 0 6px rgba(255,0,0,0.7));
+    position: relative;
+    top: 6px;
+  }
+
+  /* Canvas wrapper */
+  .wheel-wrapper {
+    position: relative;
+    width: 340px;
+    height: 340px;
+  }
+
+  canvas#wheel {
+    display: block;
+    width: 340px;
+    height: 340px;
+  }
+
+  /* Button */
+  .btn-spin {
+    margin-top: 28px;
+    padding: 14px 36px;
+    font-size: 1rem;
+    font-weight: 700;
+    background: #e63946;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: background 0.2s, transform 0.1s;
+  }
+
+  .btn-spin:hover { background: #c62828; }
+  .btn-spin:active { transform: scale(0.97); }
+  .btn-spin:disabled { background: #555; cursor: not-allowed; }
+
+  /* Popup overlay */
+  .popup-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .popup-overlay.show { display: flex; }
+
+  .popup-box {
+    background: #16213e;
+    border: 2px solid #444;
+    border-radius: 16px;
+    padding: 40px 48px;
+    text-align: center;
+    max-width: 420px;
+    animation: popIn 0.3s ease;
+  }
+
+  @keyframes popIn {
+    from { transform: scale(0.7); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+
+  .popup-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+  }
+
+  .popup-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .popup-desc {
+    font-size: 1rem;
+    color: #bbb;
+    line-height: 1.6;
+    margin-bottom: 28px;
+  }
+
+  .popup-close {
+    padding: 10px 32px;
+    background: #0f3460;
+    color: #fff;
+    border: 1px solid #1a5276;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .popup-close:hover { background: #1a5276; }
+</style>
+</head>
+<body>
+
+<h1>Demand Side Energy Management</h1>
+
+<div class="layout">
+
+  <!-- KEY (left) -->
+  <div class="key-panel">
+    <h2>Key</h2>
+    <div class="key-item">
+      <div class="key-dot peak"></div>
+      <span class="key-label">Peak</span>
+    </div>
+    <div class="key-item">
+      <div class="key-dot standard"></div>
+      <span class="key-label">Standard</span>
+    </div>
+    <div class="key-item">
+      <div class="key-dot offpeak"></div>
+      <span class="key-label">Off-peak</span>
+    </div>
+  </div>
+
+  <!-- WHEEL + Arrow (right) -->
+  <div class="wheel-area">
+    <!-- Arrow above wheel pointing down -->
+    <div class="arrow-container">
+      <div class="arrow"></div>
+    </div>
+    <div class="wheel-wrapper">
+      <canvas id="wheel" width="340" height="340"></canvas>
+    </div>
+    <button class="btn-spin" id="spinBtn" onclick="startSpin()">
+      Make a demand side energy shift
+    </button>
+  </div>
+
+</div>
+
+<!-- Popup -->
+<div class="popup-overlay" id="popup">
+  <div class="popup-box">
+    <div class="popup-icon" id="popupIcon"></div>
+    <div class="popup-title" id="popupTitle"></div>
+    <div class="popup-desc" id="popupDesc"></div>
+    <button class="popup-close" onclick="closePopup()">Close</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('wheel');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+const cx = W / 2;
+const cy = H / 2;
+const R = W / 2 - 4;
+
+/*
+  Tariff wheel structure (from analysing the image):
+  24 hour segments, numbered 1–24 (0 = 24).
+  Three rings: outermost = weekdays, middle = saturday, inner = sunday.
+  
+  Color mapping per hour (0=midnight to 23) based on image analysis:
+  
+  WEEKDAYS (outer ring):
+  0-6   green (off-peak)  — hours 24/1/2/3/4/5/6
+  7     green
+  8-9   yellow (standard)
+  10-16 green
+  17-19 red (peak)
+  20    yellow
+  21    yellow
+  22-23 green
+
+  SATURDAY (middle):
+  0-6   green
+  7-9   yellow
+  10-12 green
+  13-14 yellow
+  15-16 green
+  17    red
+  18    yellow
+  19-23 green
+
+  SUNDAY (inner):
+  0-23  all green (off-peak)
+
+  The wheel visual is a single merged ring for display.
+  We draw all 3 rings with their colours.
+*/
+
+const PEAK     = '#cc2222';
+const STANDARD = '#e6c800';
+const OFFPEAK  = '#1e7e34';
+const DARK_OFFPEAK = '#155724';
+
+// 24 segments — index 0 = hour 0 (midnight/24), going clockwise
+// Weekdays
+const weekdayColors = [
+  OFFPEAK,  // 0 (24)
+  OFFPEAK,  // 1
+  OFFPEAK,  // 2
+  OFFPEAK,  // 3
+  OFFPEAK,  // 4
+  OFFPEAK,  // 5
+  OFFPEAK,  // 6
+  OFFPEAK,  // 7
+  STANDARD, // 8
+  STANDARD, // 9
+  OFFPEAK,  // 10
+  OFFPEAK,  // 11
+  OFFPEAK,  // 12
+  OFFPEAK,  // 13
+  OFFPEAK,  // 14
+  OFFPEAK,  // 15
+  OFFPEAK,  // 16
+  PEAK,     // 17
+  PEAK,     // 18
+  PEAK,     // 19
+  STANDARD, // 20
+  STANDARD, // 21
+  OFFPEAK,  // 22
+  OFFPEAK,  // 23
+];
+
+const saturdayColors = [
+  OFFPEAK,  // 0
+  OFFPEAK,  // 1
+  OFFPEAK,  // 2
+  OFFPEAK,  // 3
+  OFFPEAK,  // 4
+  OFFPEAK,  // 5
+  OFFPEAK,  // 6
+  STANDARD, // 7
+  STANDARD, // 8
+  STANDARD, // 9
+  OFFPEAK,  // 10
+  OFFPEAK,  // 11
+  OFFPEAK,  // 12
+  STANDARD, // 13
+  STANDARD, // 14
+  OFFPEAK,  // 15
+  OFFPEAK,  // 16
+  PEAK,     // 17
+  STANDARD, // 18
+  OFFPEAK,  // 19
+  OFFPEAK,  // 20
+  OFFPEAK,  // 21
+  OFFPEAK,  // 22
+  OFFPEAK,  // 23
+];
+
+// Sunday: all off-peak
+const sundayColors = Array(24).fill(OFFPEAK);
+
+// Ring radii
+const r3 = R;        // outer edge of weekday ring
+const r2 = R * 0.78; // inner edge of weekday / outer of saturday
+const r1 = R * 0.60; // inner edge of saturday / outer of sunday
+const r0 = R * 0.42; // inner edge of sunday (hub starts)
+const hubR = R * 0.16;
+
+let rotation = 0; // current wheel rotation in radians
+let spinning = false;
+
+function drawWheel(rot) {
+  ctx.clearRect(0, 0, W, H);
+  const segAngle = (Math.PI * 2) / 24;
+
+  for (let i = 0; i < 24; i++) {
+    const startA = rot + i * segAngle - Math.PI / 2;
+    const endA   = startA + segAngle;
+
+    // Weekday ring (outer)
+    ctx.beginPath();
+    ctx.moveTo(cx + r2 * Math.cos(startA), cy + r2 * Math.sin(startA));
+    ctx.arc(cx, cy, r3, startA, endA);
+    ctx.arc(cx, cy, r2, endA, startA, true);
+    ctx.closePath();
+    ctx.fillStyle = weekdayColors[i];
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Saturday ring (middle)
+    ctx.beginPath();
+    ctx.moveTo(cx + r1 * Math.cos(startA), cy + r1 * Math.sin(startA));
+    ctx.arc(cx, cy, r2, startA, endA);
+    ctx.arc(cx, cy, r1, endA, startA, true);
+    ctx.closePath();
+    ctx.fillStyle = saturdayColors[i];
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Sunday ring (inner)
+    ctx.beginPath();
+    ctx.moveTo(cx + r0 * Math.cos(startA), cy + r0 * Math.sin(startA));
+    ctx.arc(cx, cy, r1, startA, endA);
+    ctx.arc(cx, cy, r0, endA, startA, true);
+    ctx.closePath();
+    ctx.fillStyle = sundayColors[i];
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  }
+
+  // Outer border
+  ctx.beginPath();
+  ctx.arc(cx, cy, r3, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Draw ring labels (fixed, not rotating)
+  ctx.save();
+  ctx.font = 'bold 11px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  const lrMid1 = (r2 + r3) / 2;
+  const lrMid2 = (r1 + r2) / 2;
+  const lrMid3 = (r0 + r1) / 2;
+  ctx.fillText('WEEKDAYS', cx, cy - lrMid1);
+  ctx.fillText('SATURDAY', cx, cy - lrMid2);
+  ctx.fillText('SUNDAY',   cx, cy - lrMid3);
+  ctx.restore();
+
+  // Hub
+  ctx.beginPath();
+  ctx.arc(cx, cy, hubR, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a2a4a';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Hour numbers around outer edge
+  ctx.save();
+  ctx.font = 'bold 11px Arial';
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const labelR = r3 + 16;
+  for (let i = 0; i < 24; i++) {
+    const a = rot + i * segAngle - Math.PI / 2 + segAngle / 2;
+    const lx = cx + labelR * Math.cos(a);
+    const ly = cy + labelR * Math.sin(a);
+    const hour = i === 0 ? 24 : i;
+    ctx.fillText(String(hour), lx, ly);
+  }
+  ctx.restore();
+
+  // Spoke lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i < 24; i++) {
+    const a = rot + i * segAngle - Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx + r0 * Math.cos(a), cy + r0 * Math.sin(a));
+    ctx.lineTo(cx + r3 * Math.cos(a), cy + r3 * Math.sin(a));
+    ctx.stroke();
+  }
+}
+
+// Initial draw
+drawWheel(rotation);
+
+// Spin logic
+function startSpin() {
+  if (spinning) return;
+  spinning = true;
+  document.getElementById('spinBtn').disabled = true;
+
+  const totalDuration = 2600; // ms, max ~3s
+  const extraSpins = 3 + Math.random() * 4; // 3–7 full rotations
+  const randomOffset = Math.random() * Math.PI * 2;
+  const totalAngle = extraSpins * Math.PI * 2 + randomOffset;
+
+  const startRot = rotation;
+  const startTime = performance.now();
+
+  function easeOut(t) {
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  function frame(now) {
+    const elapsed = now - startTime;
+    const t = Math.min(elapsed / totalDuration, 1);
+    const eased = easeOut(t);
+    rotation = startRot + totalAngle * eased;
+    drawWheel(rotation);
+
+    if (t < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      spinning = false;
+      document.getElementById('spinBtn').disabled = false;
+      showResult();
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+
+function showResult() {
+  // Arrow points at the top of the wheel (12 o'clock = -Math.PI/2 in canvas coords)
+  // Determine which hour segment the top is pointing to
+  const segAngle = (Math.PI * 2) / 24;
+  // Top of wheel is angle = -Math.PI/2 in absolute terms
+  // In rotated frame: segment index = ((top_angle - rotation) / segAngle) mod 24
+  let topAngle = -Math.PI / 2;
+  // Normalize to find segment
+  let relAngle = ((topAngle - rotation) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+  // segment 0 starts at angle = rotation - PI/2, so relAngle is from the start of segment 0
+  let segIndex = Math.floor(relAngle / segAngle) % 24;
+
+  // Get color from outermost (weekday) ring
+  const color = weekdayColors[segIndex];
+  const hour  = segIndex === 0 ? 24 : segIndex;
+
+  let title, desc, bg;
+  if (color === PEAK) {
+    title = 'Peak';
+    desc  = `You've landed on hour ${hour} — a peak tariff period. Electricity demand is at its highest. Shift energy-intensive tasks away from this window to reduce costs and strain on the grid.`;
+    bg    = '#cc2222';
+  } else if (color === STANDARD) {
+    title = 'Standard';
+    desc  = `You've landed on hour ${hour} — a standard tariff period. Demand is moderate. You can run appliances at normal rates, but shifting to off-peak will save more.`;
+    bg    = '#b8a000';
+  } else {
+    title = 'Off-peak';
+    desc  = `You've landed on hour ${hour} — an off-peak tariff period. Electricity is cheapest now. This is the ideal time to run high-consumption appliances such as dishwashers, washing machines, and EV chargers.`;
+    bg    = '#1e7e34';
+  }
+
+  document.getElementById('popupIcon').style.background = bg;
+  document.getElementById('popupTitle').textContent = title;
+  document.getElementById('popupTitle').style.color = bg === '#b8a000' ? '#e6c800' : bg;
+  document.getElementById('popupDesc').textContent = desc;
+  document.getElementById('popup').classList.add('show');
+}
+
+function closePopup() {
+  document.getElementById('popup').classList.remove('show');
+}
+
+// Close popup on overlay click
+document.getElementById('popup').addEventListener('click', function(e) {
+  if (e.target === this) closePopup();
+});
+</script>
+</body>
+</html>
