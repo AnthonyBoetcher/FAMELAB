@@ -89,28 +89,6 @@
     align-items: center;
   }
 
-  /* Arrow sits above the wheel, pointing down into the top segment */
-  .arrow-container {
-    position: relative;
-    width: 340px;
-    height: 50px;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    pointer-events: none;
-  }
-
-  .arrow {
-    width: 0;
-    height: 0;
-    border-left: 22px solid transparent;
-    border-right: 22px solid transparent;
-    border-top: 40px solid #ff1a1a;
-    filter: drop-shadow(0 0 6px rgba(255,0,0,0.7));
-    position: relative;
-    top: 6px;
-  }
-
   /* Canvas wrapper */
   .wheel-wrapper {
     position: relative;
@@ -229,12 +207,8 @@
     </div>
   </div>
 
-  <!-- WHEEL + Arrow (right) -->
+  <!-- WHEEL (right) -->
   <div class="wheel-area">
-    <!-- Arrow above wheel pointing down -->
-    <div class="arrow-container">
-      <div class="arrow"></div>
-    </div>
     <div class="wheel-wrapper">
       <canvas id="wheel" width="340" height="340"></canvas>
     </div>
@@ -262,7 +236,7 @@ const W = canvas.width;
 const H = canvas.height;
 const cx = W / 2;
 const cy = H / 2;
-const R = W / 2 - 4;
+const R = W / 2 - 28;
 
 /*
   Tariff wheel structure (from analysing the image):
@@ -516,8 +490,7 @@ function startSpin() {
 }
 
 function showResult() {
-  // Arrow points at the top of the wheel (12 o'clock = -Math.PI/2 in canvas coords)
-  // Determine which hour segment the top is pointing to
+  // Determine which hour segment is at the top of the wheel (12 o'clock)
   const segAngle = (Math.PI * 2) / 24;
   // Top of wheel is angle = -Math.PI/2 in absolute terms
   // In rotated frame: segment index = ((top_angle - rotation) / segAngle) mod 24
